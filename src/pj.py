@@ -6,30 +6,32 @@ from bs4 import BeautifulSoup as bs
 import requests
 import re
 import json
+import csv
 
 cookies = None
 
-def next_page(url, page):
+def details(url):
   global cookies
-  url = 'http://www.pagesjaunes.fr' + url + '&page=' + str(page)
   print(url)
   r = requests.get(url, cookies=cookies)
   cookies = r.cookies
   soup = bs(r.text, 'html.parser')
-  results = soup.select('.bi-pro.bi-bloc.blocs')
-  for rs in results:
-    nom = rs.select_one('.denomination-links.pj-link')
-    adresse = rs.select_one('.adresse.pj-lb.pj-link')
-    type_num = rs.select_one('div.item.bi-contact-tel > span > span')
-    num = rs.select_one('div.item.bi-contact-tel > span strong')
-    print((nom.string.strip() if nom != None and nom.string != None else ''), 
-          (adresse.string.strip() if adresse != None and adresse.string != None else ''), 
-          (type_num.string.strip() if type_num != None and type_num.string != None else ''), 
-          (num.string.strip() if num != None and num.string != None else ''))
-  # end for
-# end next_page
+  activite = soup.select_one(".coord-rubrique")
+  dict_details = {'tel': [], 'fax': [], 'mobile': [], 'activite': activite.string.strip()}
+  li_tel = soup.select("#coord-liste-numero_1 li")
+  for li in li_tel:
+    type_num = li.select_one('.num-tel-label').string[:3]
+    num = li.select_one('.coord-numero').string.strip()
+    if type_num.lower() == 'tél':
+      dict_details['tel'].append(num)
+    elif type_num.lower() == 'fax':
+      dict_details['fax'].append(num)
+    elif type_num.lower() == 'mob':
+      dict_details['mobile'].append(num)
+  return dict_details
+# end details()
 
-def data(activite, departement):
+def first_request(activite, departement):
   global cookies, regex_url_next
   r = requests.get("http://www.pagesjaunes.fr/")
   cookies = r.cookies
@@ -63,58 +65,59 @@ def data(activite, departement):
   nb_result = soup.select_one('#SEL-nbresultat').string
   nb_pages = (int(nb_result) // 20) + 1
   print(nb_result, nb_pages)
-  results = soup.select('.bi-pro.bi-bloc.blocs')
   page = 1
   url_next = ''
   match = regex_url_next.search(r.text, re.MULTILINE)
   if (match):
     url_next = match.group(1)
-  while page <= nb_pages:
-    print("page", page)
-    for rs in results:
-      json_str = rs["data-pjtoggleclasshisto"]
-      dict_json = json.loads(json_str)
-      id_bloc = dict_json['idbloc']['id_bloc']
-      if (dict_json['idbloc']['no_sequence']):
-        no_sequence = int(dict_json['idbloc']['no_sequence'].lstrip('0'))
-      else:
-        no_sequence = ''
-      print(id_bloc, no_sequence)
-      nom = rs.select_one('.denomination-links.pj-link')
-      plus_details = rs.select_one('.item.plus-coordonnees')  
-      adresse = rs.select_one('.adresse.pj-lb.pj-link')
-      phone1 = ''
-      phone2 = ''
-      mobile = ''
-      fax = ''
-      if (plus_details):
-        details(r"http://www.pagesjaunes.fr/pros/detail?bloc_id=%s&no_sequence=%d#ancreBlocCoordonnees" % (id_bloc, no_sequence));        
-      else:
-        type_num = rs.select_one('div.item.bi-contact-tel > span > span')
-        num = rs.select_one('div.item.bi-contact-tel > span strong')
-      print((nom.string.strip() if nom != None and nom.string != None else ''), 
-            (adresse.string.strip() if adresse != None and adresse.string != None else ''))
-    # end for
-    page+=1
-    if url_next:
-      next_page(url_next, page)
-  # end while
-# end data()
+  with open('extract.csv', mode='w', newline='') as extract:
+    fieldnames = ['nom', 'adresse', 'tel_1', 'tel_2', 'fax', 'mobile', 'activite', 'dept']
+    writer = csv.DictWriter(extract, fieldnames=fieldnames)
+    writer.writeheader()
+    while page <= nb_pages:
+      print("page", page)
+      url = 'http://www.pagesjaunes.fr' + url_next + '&page=' + str(page)
+      data = lire_page(url)
+      for infos in data:
+        row = {'nom': infos['nom'], 'adresse': infos['adresse'], 'activite': infos['activite'], 'dept': departement}
+        tels = infos['tel']
+        row['tel_1'] = tels[0] if len(tels) > 0 else ''
+        row['tel_2'] = tels[1] if len(tels) > 1 else ''
+        row['fax'] = infos['fax'][0] if len(infos['fax']) > 0 else ''
+        row['mobile'] = infos['mobile'][0] if len(infos['mobile']) > 0 else ''
+        writer.writerow(row)
+      page+=1
 
-def details(url):
+def lire_page(url):
   global cookies
   r = requests.get(url, cookies=cookies)
   cookies = r.cookies
   soup = bs(r.text, 'html.parser')
-  li_tel = soup.select("#coord-liste-numero_1 li")
-  for li in li_tel:
-    print(li.select_one('.coord-numero').string)
-# end details()
+  results = soup.select('.bi-pro.bi-bloc.blocs')
+  data = []
+  for rs in results:
+    json_str = rs["data-pjtoggleclasshisto"]
+    dict_json = json.loads(json_str)
+    id_bloc = dict_json['idbloc']['id_bloc']
+    if (dict_json['idbloc']['no_sequence']):
+      str_no_sequence = dict_json['idbloc']['no_sequence'].lstrip('0')
+      no_sequence = int(str_no_sequence)
+    else:
+      no_sequence = 0
+    nom = rs.select_one('.denomination-links.pj-link')
+    adresse = rs.select_one('.adresse.pj-lb.pj-link')
+    d = details(r"http://www.pagesjaunes.fr/pros/detail?bloc_id=%s&no_sequence=%d#ancreBlocCoordonnees" % (id_bloc, no_sequence))
+    d['nom'] = nom.string.strip()
+    d['adresse'] = adresse.string.strip()
+    data.append(d)
+  return data
+  # end for
+# end data()
 
 if __name__ == "__main__":
   regex_url_next = re.compile(r'"technicalUrl":"(.*?)"');
 #  departements = ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","2A","2B","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59","60","61","62","63","64","65","66","67","68","69","70","71","72","73","74","75","76","77","78","79","80","81","82","83","84","85","86","87","88","89","90","91","92","93","94","95"]
 #  for d in departements:
 #    print("Département %s" % d)
-  data('medecins generalistes', "01")
+  first_request('agence de voyage', "01")
   # end for
