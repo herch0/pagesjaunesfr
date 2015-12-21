@@ -3,19 +3,35 @@
 # and open the template in the editor.
 
 from bs4 import BeautifulSoup as bs
-import requests
-import re
-import json
 import csv
+import json
+import re
+import requests
 import time
 
 cookies = None
 writer = None
 
+#proxies = {
+#  "https": "https://212.112.102.43:8080",
+#  "http": "http://101.26.38.162:80",
+#}
+
+proxies = None
+
+headers = {
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/47.0.2526.73 Chrome/47.0.2526.73 Safari/537.36',
+}
+
 def details(url):
-  global cookies
+  global cookies, proxies, headers
+#  print('début details')
   print(url)
-  r = requests.get(url, cookies=cookies)
+  try:
+    r = requests.get(url, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
+  except requests.exceptions.Timeout as e:
+    print(e)
+    r = requests.get(url, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
   cookies = r.cookies
   soup = bs(r.text, 'html.parser')
   activite = soup.select_one(".coord-rubrique")
@@ -33,12 +49,18 @@ def details(url):
         dict_details['fax'].append(num)
       elif type_num.lower() == 'mob':
         dict_details['mobile'].append(num)
+#  print('fin details')
   return dict_details
 # end details()
 
 def first_request(activite, departement):
-  global cookies, regex_url_next, writer
-  r = requests.get("http://www.pagesjaunes.fr/")
+  global cookies, regex_url_next, writer, proxies, headers
+#  print('debut first_request')
+  try:
+    r = requests.get("http://www.pagesjaunes.fr/", proxies=proxies, headers=headers, timeout=30)
+  except requests.exceptions.Timeout as e:
+    print(e)
+    r = requests.get("http://www.pagesjaunes.fr/", proxies=proxies, headers=headers, timeout=30)
   cookies = r.cookies
   post_params = {
     'pj4valid':'true',
@@ -64,7 +86,11 @@ def first_request(activite, departement):
   'nbPropositionQuiQuoiTop':'0',
   'nbPropositionQuiQuoiHisto':'1',
 }
-  r = requests.post('http://www.pagesjaunes.fr/annuaire/chercherlespros', data=post_params, cookies=cookies)
+  try:
+    r = requests.post('http://www.pagesjaunes.fr/annuaire/chercherlespros', data=post_params, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
+  except requests.exceptions.Timeout as e:
+    print(e)
+    r = requests.post('http://www.pagesjaunes.fr/annuaire/chercherlespros', data=post_params, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
   cookies = r.cookies
   soup = bs(r.text, 'html.parser')
   nb_result = 0
@@ -94,12 +120,19 @@ def first_request(activite, departement):
       writer.writerow(row)
     # end for
     page += 1
-#    time.sleep(10)
+#    time.sleep(3)
   # end while
+#  print('fin first_request')
+# fin first_request
 
 def lire_page(url):
-  global cookies
-  r = requests.get(url, cookies=cookies)
+  global cookies, proxies, headers
+#  print('debut lire_page')
+  try:
+    r = requests.get(url, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
+  except requests.exceptions.Timeout as e:
+    print(e)
+    r = requests.get(url, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
   cookies = r.cookies
   soup = bs(r.text, 'html.parser')
   results = soup.select('.bi-pro.bi-bloc.blocs')
@@ -121,26 +154,33 @@ def lire_page(url):
     data.append(d)
 #    time.sleep(1)
   # end for
+#  print('fin lire_page')
   return data
 # end data()
 
 if __name__ == "__main__":
   regex_url_next = re.compile(r'"technicalUrl":"(.*?)"');
   departements = [
-  "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2A", "2B", "21", "22", "23", 
-  "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95"]
-  with open('charpente.csv', mode='w', newline='') as extract:
+#  "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", 
+#  "16", "17", "18", "19", "2A", "2B", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", 
+#  "33", "34", "35", "36", 
+  "37", 
+  "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", 
+  "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95"]
+  with open('construction4.csv', mode='w', newline='') as extract:
     fieldnames = ['nom', 'adresse', 'tel_1', 'tel_2', 'fax', 'mobile', 'activite1', 'activite2', 'dept']
-    writer = csv.DictWriter(extract, fieldnames=fieldnames)
+    writer = csv.DictWriter(extract, fieldnames=fieldnames, delimiter=";")
     writer.writeheader()
     for d in departements:
       print("Département %s" % d)
       try:
-        first_request('charpente', d)
-      except:
+        first_request('construction', d)
+      except Exception as e:
+        print(e)
         try:
-          first_request('charpente', d)
-        except: 
+          first_request('construction', d)
+        except Exception as e:
+          print(e)
           continue
 #      time.sleep(10)
-    # end for
+  # end for
