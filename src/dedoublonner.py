@@ -16,6 +16,8 @@ if __name__ == "__main__":
       for row in reader:
         if len(row) > 0:
           val = row[args.colonne]
+          val = val.lstrip('.').strip()
+          row[args.colonne] = val
           if val not in uniques:
             writer.writerow(row)
             uniques.append(val)

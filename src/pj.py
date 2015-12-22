@@ -25,7 +25,6 @@ headers = {
 
 def details(url):
   global cookies, proxies, headers
-#  print('début details')
   print(url)
   try:
     r = requests.get(url, cookies=cookies, proxies=proxies, headers=headers, timeout=30)
@@ -41,8 +40,8 @@ def details(url):
     type_num = li.select_one('.num-tel-label')
     num = li.select_one('.coord-numero')
     if (type_num and num):
-      type_num = type_num.string[:3]
-      num = num.string.strip()
+      type_num = type_num.string[:3] if type_num else ''
+      num = num.string.strip() if num else ''
       if type_num.lower() == 'tél':
         dict_details['tel'].append(num)
       elif type_num.lower() == 'fax':
@@ -55,7 +54,6 @@ def details(url):
 
 def first_request(activite, departement):
   global cookies, regex_url_next, writer, proxies, headers
-#  print('debut first_request')
   try:
     r = requests.get("http://www.pagesjaunes.fr/", proxies=proxies, headers=headers, timeout=30)
   except requests.exceptions.Timeout as e:
@@ -120,9 +118,7 @@ def first_request(activite, departement):
       writer.writerow(row)
     # end for
     page += 1
-#    time.sleep(3)
   # end while
-#  print('fin first_request')
 # fin first_request
 
 def lire_page(url):
@@ -149,24 +145,17 @@ def lire_page(url):
     nom = rs.select_one('.denomination-links.pj-link')
     adresse = rs.select_one('.adresse.pj-lb.pj-link')
     d = details(r"http://www.pagesjaunes.fr/pros/detail?bloc_id=%s&no_sequence=%d#ancreBlocCoordonnees" % (id_bloc, no_sequence))
-    d['nom'] = nom.string.strip()
-    d['adresse'] = adresse.string.strip()
+    d['nom'] = nom.string.strip() if nom else ''
+    d['adresse'] = adresse.string.strip() if adresse else ''
     data.append(d)
-#    time.sleep(1)
   # end for
-#  print('fin lire_page')
   return data
 # end data()
 
 if __name__ == "__main__":
   regex_url_next = re.compile(r'"technicalUrl":"(.*?)"');
   departements = [
-#  "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", 
-#  "16", "17", "18", "19", "2A", "2B", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", 
-#  "33", "34", "35", "36", 
-  "37", 
-  "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", 
-  "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95"]
+  "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2A", "2B", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95"]
   with open('construction4.csv', mode='w', newline='') as extract:
     fieldnames = ['nom', 'adresse', 'tel_1', 'tel_2', 'fax', 'mobile', 'activite1', 'activite2', 'dept']
     writer = csv.DictWriter(extract, fieldnames=fieldnames, delimiter=";")
@@ -182,5 +171,6 @@ if __name__ == "__main__":
         except Exception as e:
           print(e)
           continue
-#      time.sleep(10)
   # end for
+  
+#  'NoneType' object has no attribute 'string'
